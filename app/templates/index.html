@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Tracker Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .project-card {
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .card-body {
+            padding: 1.5rem;
+        }
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 50px;
+        }
+        .status-Active {
+            background-color: #28a745;
+            color: white;
+        }
+        .status-Dormant {
+            background-color: #ffc107;
+            color: black;
+        }
+        .status-Inactive {
+            background-color: #6c757d;
+            color: white;
+        }
+        .status-Abandoned {
+            background-color: #dc3545;
+            color: white;
+        }
+        .status-Unknown {
+            background-color: #6c757d;
+            color: white;
+        }
+        .stats-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            flex: 1;
+            min-width: 120px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .stat-box h3 {
+            margin-bottom: 0;
+            font-weight: bold;
+        }
+        .stat-box p {
+            margin-top: 5px;
+            margin-bottom: 0;
+            color: #6c757d;
+        }
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 350px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="display-4">
+                    <i class="bi bi-kanban"></i> Project Tracker
+                </h1>
+                <p class="lead text-muted">Monitor and manage your coding projects</p>
+            </div>
+            <div class="col-auto d-flex align-items-center">
+                <button id="refresh-btn" class="btn btn-primary me-2">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Alert container -->
+        <div id="alert-container" class="alert-container"></div>
+
+        <!-- Stats Overview -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Project Overview</h5>
+            </div>
+            <div class="card-body">
+                <div id="stats-container" class="stats-container">
+                    <!-- Stats will be loaded here -->
+                    <div class="stat-box">
+                        <p>Total Projects</p>
+                        <h3 id="total-count">-</h3>
+                    </div>
+                    <div class="stat-box">
+                        <p>Active</p>
+                        <h3 id="active-count">-</h3>
+                    </div>
+                    <div class="stat-box">
+                        <p>Dormant</p>
+                        <h3 id="dormant-count">-</h3>
+                    </div>
+                    <div class="stat-box">
+                        <p>Inactive</p>
+                        <h3 id="inactive-count">-</h3>
+                    </div>
+                    <div class="stat-box">
+                        <p>Abandoned</p>
+                        <h3 id="abandoned-count">-</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="status-filter" class="form-label">Status</label>
+                        <select id="status-filter" class="form-select">
+                            <option value="All">All Statuses</option>
+                            <option value="Active">Active</option>
+                            <option value="Dormant">Dormant</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Abandoned">Abandoned</option>
+                            <option value="Unknown">Unknown</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="sort-by" class="form-label">Sort By</label>
+                        <select id="sort-by" class="form-select">
+                            <option value="name">Name</option>
+                            <option value="status">Status</option>
+                            <option value="last_commit">Last Commit Date</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects List -->
+        <div class="row" id="projects-container">
+            <!-- Projects cards will be loaded here -->
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading projects...</p>
+            </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="loading" class="loading d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Format date to a readable format
+        function formatDate(isoDate) {
+            if (!isoDate) return 'N/A';
+            const date = new Date(isoDate);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+
+        // Format time difference from now
+        function timeAgo(isoDate) {
+            if (!isoDate) return 'N/A';
+            
+            const date = new Date(isoDate);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return 'Today';
+            } else if (diffDays === 1) {
+                return 'Yesterday';
+            } else if (diffDays < 30) {
+                return `${diffDays} days ago`;
+            } else if (diffDays < 365) {
+                const months = Math.floor(diffDays / 30);
+                return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+            } else {
+                const years = Math.floor(diffDays / 365);
+                return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+            }
+        }
+
+        // Load projects from API
+        async function loadProjects() {
+            try {
+                // Show loading
+                document.getElementById('loading').classList.remove('d-none');
+                
+                // Get filter values
+                const statusFilter = document.getElementById('status-filter').value;
+                const sortBy = document.getElementById('sort-by').value;
+                
+                // Fetch projects with query parameters
+                const response = await fetch(`/projects?status=${statusFilter}&sort=${sortBy}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load projects');
+                }
+                
+                const data = await response.json();
+                const projectsContainer = document.getElementById('projects-container');
+                
+                // Clear container
+                projectsContainer.innerHTML = '';
+                
+                // Update stats
+                document.getElementById('total-count').textContent = data.counts.total;
+                document.getElementById('active-count').textContent = data.counts.active;
+                document.getElementById('dormant-count').textContent = data.counts.dormant;
+                document.getElementById('inactive-count').textContent = data.counts.inactive;
+                document.getElementById('abandoned-count').textContent = data.counts.abandoned;
+                
+                // Display alerts if any
+                const alertContainer = document.getElementById('alert-container');
+                alertContainer.innerHTML = '';
+                
+                if (data.alerts && data.alerts.length > 0) {
+                    data.alerts.forEach(alert => {
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = `alert alert-${alert.type} alert-dismissible fade show`;
+                        alertDiv.innerHTML = `
+                            ${alert.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        `;
+                        alertContainer.appendChild(alertDiv);
+                    });
+                }
+                
+                // Display projects
+                if (data.projects.length === 0) {
+                    projectsContainer.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-folder-x" style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted">No projects found. Try adjusting your filters.</p>
+                        </div>
+                    `;
+                } else {
+                    data.projects.forEach(project => {
+                        const card = document.createElement('div');
+                        card.className = 'col-md-6 col-lg-4';
+                        card.innerHTML = `
+                            <div class="card project-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">${project.name}</h5>
+                                    <span class="badge status-badge status-${project.status}">${project.status}</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Path:</strong> ${project.path}</p>
+                                    <p><strong>Created:</strong> ${formatDate(project.created_date)}</p>
+                                    <p><strong>Last Modified:</strong> ${formatDate(project.modified_date)}</p>
+                                    ${project.is_git_repo ? `
+                                        <hr>
+                                        <p><strong>Git Repository:</strong> Yes</p>
+                                        <p><strong>Last Commit:</strong> ${timeAgo(project.last_commit_date)}</p>
+                                        <p><strong>Total Commits:</strong> ${project.total_commits}</p>
+                                        <p><strong>Commit Frequency:</strong> ${project.commit_frequency.toFixed(2)} per week</p>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                        projectsContainer.appendChild(card);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading projects:', error);
+                // Show error message
+                document.getElementById('projects-container').innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-exclamation-triangle" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">Failed to load projects. Please try again.</p>
+                    </div>
+                `;
+            } finally {
+                // Hide loading
+                document.getElementById('loading').classList.add('d-none');
+            }
+        }
+
+        // Trigger scan
+        async function triggerScan() {
+            try {
+                document.getElementById('loading').classList.remove('d-none');
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to trigger scan');
+                }
+                
+                const data = await response.json();
+                console.log('Scan completed:', data);
+                
+                // Reload projects
+                await loadProjects();
+                
+            } catch (error) {
+                console.error('Error during scan:', error);
+                const alertContainer = document.getElementById('alert-container');
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        Failed to scan projects: ${error.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            } finally {
+                document.getElementById('loading').classList.add('d-none');
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial load
+            loadProjects();
+            
+            // Refresh button
+            document.getElementById('refresh-btn').addEventListener('click', triggerScan);
+            
+            // Filters
+            document.getElementById('status-filter').addEventListener('change', loadProjects);
+            document.getElementById('sort-by').addEventListener('change', loadProjects);
+        });
+    </script>
+</body>
+</html> 

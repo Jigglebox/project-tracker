@@ -1,0 +1,33 @@
+# Configuration file for Project Tracker
+
+# Directory to scan for code projects
+scan_directory: "D:/Documents/Scripts"  # Change this to your code projects root directory
+
+# Project classification thresholds (in days)
+thresholds:
+  active: 30       # Projects with commits in the last 30 days
+  dormant: 90      # Projects with commits between 30 and 90 days ago
+  abandoned: 180   # Projects with no commits for more than 180 days
+
+# Project markers (files/directories that indicate a code project)
+project_markers:
+  - ".git"
+  - "README.md"
+  - "package.json"
+  - "requirements.txt"
+  - "Cargo.toml"
+  - "pom.xml"
+  - "setup.py"
+  - "Makefile"
+  - "build.gradle"
+
+# Web interface settings
+web:
+  host: "127.0.0.1"
+  port: 5000
+  debug: true
+
+# Notification settings
+notifications:
+  console_logging: true    # Enable console logging
+  active_projects_alert: 3 # Alert if starting a new project while having more than X active projects 
