@@ -34,6 +34,15 @@ class Project:
     total_commits: int = 0
     languages: Dict[str, int] = field(default_factory=dict)
     
+    # New Git-specific fields
+    current_branch: str = ""
+    uncommitted_changes: int = 0
+    untracked_files: int = 0
+    ahead_count: int = 0
+    behind_count: int = 0
+    branches: List[str] = field(default_factory=list)
+    recent_commits: List[Dict[str, str]] = field(default_factory=list)
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert object to dictionary."""
         return asdict(self)
@@ -141,7 +150,7 @@ class ProjectScanner:
         try:
             repo = git.Repo(project.path)
             
-            # Get commit info
+            # Basic commit info
             try:
                 commits = list(repo.iter_commits())
                 project.total_commits = len(commits)
@@ -159,6 +168,42 @@ class ProjectScanner:
                         time_span = latest_commit.committed_date - first_commit.committed_date
                         weeks = max(1, time_span / (7 * 24 * 3600))
                         project.commit_frequency = project.total_commits / weeks
+                    
+                    # Get recent commits
+                    project.recent_commits = [
+                        {
+                            'hash': str(c.hexsha)[:8],
+                            'message': c.message.split('\n')[0],
+                            'author': c.author.name,
+                            'date': datetime.fromtimestamp(c.committed_date).isoformat()
+                        }
+                        for c in commits[:5]  # Last 5 commits
+                    ]
+                
+                # Get current branch and all branches
+                project.current_branch = repo.active_branch.name
+                project.branches = [b.name for b in repo.branches]
+                
+                # Get status info
+                if not repo.bare:
+                    # Count uncommitted changes
+                    project.uncommitted_changes = len(repo.index.diff(None))
+                    
+                    # Count untracked files
+                    project.untracked_files = len(repo.untracked_files)
+                    
+                    # Get ahead/behind counts if we have a remote
+                    if len(repo.remotes) > 0:
+                        try:
+                            remote = repo.remotes.origin
+                            remote.fetch()
+                            ahead_behind = repo.iter_commits('origin/main..main')
+                            project.ahead_count = sum(1 for _ in ahead_behind)
+                            behind_behind = repo.iter_commits('main..origin/main')
+                            project.behind_count = sum(1 for _ in behind_behind)
+                        except Exception as e:
+                            logger.warning(f"Error getting remote status: {str(e)}")
+                
             except Exception as e:
                 logger.warning(f"Error analyzing commits for {project.path}: {str(e)}")
                 

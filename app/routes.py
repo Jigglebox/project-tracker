@@ -6,6 +6,8 @@ import sys
 import os
 import logging
 from datetime import datetime
+import git
+from git.exc import GitCommandError
 
 # Add parent directory to path so we can import project_scanner
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -93,4 +95,71 @@ def scan_now():
         return jsonify({'status': 'success', 'count': len(projects)})
     except Exception as e:
         logger.error(f"Error during scan: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500 
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@main_bp.route('/git/pull', methods=['POST'])
+def git_pull():
+    """Pull changes from remote repository."""
+    try:
+        data = request.get_json()
+        repo_path = data.get('path')
+        
+        if not repo_path:
+            return jsonify({'error': 'No repository path provided'}), 400
+        
+        repo = git.Repo(repo_path)
+        origin = repo.remotes.origin
+        origin.pull()
+        
+        return jsonify({'status': 'success', 'message': 'Successfully pulled changes'})
+    except GitCommandError as e:
+        logger.error(f"Git pull error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        logger.error(f"Error during pull: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/git/commit', methods=['POST'])
+def git_commit():
+    """Commit changes in repository."""
+    try:
+        data = request.get_json()
+        repo_path = data.get('path')
+        message = data.get('message')
+        
+        if not repo_path or not message:
+            return jsonify({'error': 'Repository path and commit message are required'}), 400
+        
+        repo = git.Repo(repo_path)
+        repo.git.add(A=True)  # Stage all changes
+        repo.index.commit(message)
+        
+        return jsonify({'status': 'success', 'message': 'Successfully committed changes'})
+    except GitCommandError as e:
+        logger.error(f"Git commit error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        logger.error(f"Error during commit: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/git/push', methods=['POST'])
+def git_push():
+    """Push changes to remote repository."""
+    try:
+        data = request.get_json()
+        repo_path = data.get('path')
+        
+        if not repo_path:
+            return jsonify({'error': 'No repository path provided'}), 400
+        
+        repo = git.Repo(repo_path)
+        origin = repo.remotes.origin
+        origin.push()
+        
+        return jsonify({'status': 'success', 'message': 'Successfully pushed changes'})
+    except GitCommandError as e:
+        logger.error(f"Git push error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        logger.error(f"Error during push: {str(e)}")
+        return jsonify({'error': str(e)}), 500 

@@ -297,10 +297,81 @@
                                     <p><strong>Last Modified:</strong> ${formatDate(project.modified_date)}</p>
                                     ${project.is_git_repo ? `
                                         <hr>
-                                        <p><strong>Git Repository:</strong> Yes</p>
-                                        <p><strong>Last Commit:</strong> ${timeAgo(project.last_commit_date)}</p>
-                                        <p><strong>Total Commits:</strong> ${project.total_commits}</p>
-                                        <p><strong>Commit Frequency:</strong> ${project.commit_frequency.toFixed(2)} per week</p>
+                                        <div class="git-info">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h6 class="mb-0"><i class="bi bi-git"></i> Git Repository</h6>
+                                                <span class="badge bg-info">${project.current_branch}</span>
+                                            </div>
+                                            
+                                            <!-- Git Status -->
+                                            <div class="git-status mb-3">
+                                                <div class="row g-2">
+                                                    <div class="col">
+                                                        <div class="p-2 border rounded text-center">
+                                                            <small>Uncommitted</small>
+                                                            <h6 class="mb-0 ${project.uncommitted_changes > 0 ? 'text-warning' : ''}">${project.uncommitted_changes}</h6>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="p-2 border rounded text-center">
+                                                            <small>Untracked</small>
+                                                            <h6 class="mb-0 ${project.untracked_files > 0 ? 'text-warning' : ''}">${project.untracked_files}</h6>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="p-2 border rounded text-center">
+                                                            <small>Ahead</small>
+                                                            <h6 class="mb-0 ${project.ahead_count > 0 ? 'text-info' : ''}">${project.ahead_count}</h6>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="p-2 border rounded text-center">
+                                                            <small>Behind</small>
+                                                            <h6 class="mb-0 ${project.behind_count > 0 ? 'text-danger' : ''}">${project.behind_count}</h6>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Git Stats -->
+                                            <p><strong>Last Commit:</strong> ${timeAgo(project.last_commit_date)}</p>
+                                            <p><strong>Total Commits:</strong> ${project.total_commits}</p>
+                                            <p><strong>Commit Frequency:</strong> ${project.commit_frequency.toFixed(2)} per week</p>
+                                            
+                                            <!-- Recent Commits -->
+                                            ${project.recent_commits.length > 0 ? `
+                                                <div class="recent-commits mt-3">
+                                                    <h6 class="mb-2">Recent Commits</h6>
+                                                    <div class="list-group">
+                                                        ${project.recent_commits.map(commit => `
+                                                            <div class="list-group-item list-group-item-action flex-column align-items-start p-2">
+                                                                <div class="d-flex w-100 justify-content-between">
+                                                                    <small class="text-muted">${commit.hash}</small>
+                                                                    <small>${timeAgo(commit.date)}</small>
+                                                                </div>
+                                                                <p class="mb-1 text-truncate">${commit.message}</p>
+                                                                <small class="text-muted">by ${commit.author}</small>
+                                                            </div>
+                                                        `).join('')}
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
+                                            <!-- Git Actions -->
+                                            <div class="git-actions mt-3">
+                                                <div class="btn-group w-100">
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="gitPull('${project.path}')">
+                                                        <i class="bi bi-cloud-download"></i> Pull
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-success" onclick="gitCommit('${project.path}')">
+                                                        <i class="bi bi-check2-circle"></i> Commit
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="gitPush('${project.path}')">
+                                                        <i class="bi bi-cloud-upload"></i> Push
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     ` : ''}
                                 </div>
                             </div>
@@ -353,6 +424,93 @@
             } finally {
                 document.getElementById('loading').classList.add('d-none');
             }
+        }
+
+        // Add Git action functions
+        async function gitPull(projectPath) {
+            try {
+                const response = await fetch('/git/pull', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path: projectPath }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to pull changes');
+                }
+                
+                // Reload projects to show updated status
+                await loadProjects();
+                
+            } catch (error) {
+                console.error('Error pulling changes:', error);
+                showAlert('danger', `Failed to pull changes: ${error.message}`);
+            }
+        }
+
+        async function gitCommit(projectPath) {
+            const message = prompt('Enter commit message:');
+            if (!message) return;
+            
+            try {
+                const response = await fetch('/git/commit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        path: projectPath,
+                        message: message
+                    }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to commit changes');
+                }
+                
+                // Reload projects to show updated status
+                await loadProjects();
+                
+            } catch (error) {
+                console.error('Error committing changes:', error);
+                showAlert('danger', `Failed to commit changes: ${error.message}`);
+            }
+        }
+
+        async function gitPush(projectPath) {
+            try {
+                const response = await fetch('/git/push', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path: projectPath }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to push changes');
+                }
+                
+                // Reload projects to show updated status
+                await loadProjects();
+                
+            } catch (error) {
+                console.error('Error pushing changes:', error);
+                showAlert('danger', `Failed to push changes: ${error.message}`);
+            }
+        }
+
+        function showAlert(type, message) {
+            const alertContainer = document.getElementById('alert-container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            alertContainer.appendChild(alertDiv);
         }
 
         // Event listeners
